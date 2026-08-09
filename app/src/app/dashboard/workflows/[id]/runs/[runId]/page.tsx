@@ -10,8 +10,8 @@ import { nhost } from '@/lib/nhost'
 import { apolloClient } from '@/lib/apollo'
 import { gql } from '@apollo/client'
 
-const GET_RUN_STATUS = gql`
-  query GetRunStatus($runId: uuid!) {
+const SUBSCRIBE_RUN_STATUS = gql`
+  subscription SubscribeRunStatus($runId: uuid!) {
     workflow_runs_by_pk(id: $runId) {
       id
       status
@@ -32,6 +32,14 @@ const GET_RUN_STATUS = gql`
           type
         }
       }
+    }
+  }
+`
+
+const APPROVE_STEP = gql`
+  mutation ApproveStep($stepRunId: uuid!) {
+    approveStep(step_run_id: $stepRunId) {
+      success
     }
   }
 `
@@ -73,36 +81,52 @@ export default function RunStatusPage({
   const router = useRouter()
   const [run, setRun] = useState<RunData | null>(null)
   const [loading, setLoading] = useState(true)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [approvingStep, setApprovingStep] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string>('viewer')
 
   useEffect(() => {
     const token = nhost.auth.getAccessToken()
     if (!token) { router.replace('/login'); return }
 
-    async function fetchStatus() {
-      const { data } = await apolloClient.query<{ workflow_runs_by_pk: RunData }>({
-        query: GET_RUN_STATUS,
+    // Get role from JWT for optimistic UI (layer 2 blocks it anyway)
+    import('@/lib/nhost').then(({ parseJwt }) => {
+      const decoded: any = parseJwt(token)
+      setUserRole(decoded?.['https://hasura.io/jwt/claims']?.['x-hasura-default-role'] ?? 'viewer')
+    })
+
+    const subscription = apolloClient
+      .subscribe<{ workflow_runs_by_pk: RunData }>({
+        query: SUBSCRIBE_RUN_STATUS,
         variables: { runId },
-        fetchPolicy: 'network-only',
       })
-      const runData = data?.workflow_runs_by_pk
-      setRun(runData || null)
-      setLoading(false)
+      .subscribe({
+        next({ data }) {
+          setRun(data?.workflow_runs_by_pk || null)
+          setLoading(false)
+        },
+        error(err) {
+          console.error('Subscription error:', err)
+        },
+      })
 
-      // Stop polling when in a terminal state
-      if (runData && TERMINAL_STATUSES.has(runData.status)) {
-        if (intervalRef.current) clearInterval(intervalRef.current)
-      }
-    }
-
-    fetchStatus()
-    // Poll every 2s (replaced by subscription in Slice 2)
-    intervalRef.current = setInterval(fetchStatus, 2000)
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
+    return () => subscription.unsubscribe()
   }, [runId, router])
+
+  const handleApprove = async (stepRunId: string) => {
+    if (userRole === 'viewer') return alert('Viewers cannot approve steps.')
+    setApprovingStep(stepRunId)
+    try {
+      const result: any = await apolloClient.mutate({
+        mutation: APPROVE_STEP,
+        variables: { stepRunId },
+      })
+      if (result.errors?.length) throw new Error(result.errors[0].message)
+    } catch (err: any) {
+      alert(`Approval failed: ${err.message}`)
+    } finally {
+      setApprovingStep(null)
+    }
+  }
 
   if (loading) return <Screen><p style={styles.muted}>Loading run…</p></Screen>
   if (!run) return <Screen><p style={styles.errorText}>Run not found.</p></Screen>
@@ -124,8 +148,11 @@ export default function RunStatusPage({
             >
               {run.status}
             </span>
-            {!isTerminal && (
-              <span style={styles.polling}>● polling every 2s</span>
+            {!isTerminal && run.status !== 'paused' && (
+              <span style={styles.polling}>● live updates</span>
+            )}
+            {run.status === 'paused' && (
+              <span style={styles.awaiting}>Awaiting Approval</span>
             )}
           </div>
         </div>
@@ -157,6 +184,18 @@ export default function RunStatusPage({
                 )}
                 {sr.output && sr.status === 'completed' && (
                   <pre style={styles.outputPre}>{JSON.stringify(sr.output, null, 2)}</pre>
+                )}
+                {sr.status === 'paused' && sr.workflow_step.type === 'approval_gate' && (
+                  <div style={{ marginTop: 12 }}>
+                    <button
+                      onClick={() => handleApprove(sr.id)}
+                      disabled={approvingStep === sr.id || userRole === 'viewer'}
+                      style={{ ...styles.approveBtn, opacity: (approvingStep === sr.id || userRole === 'viewer') ? 0.5 : 1 }}
+                    >
+                      {approvingStep === sr.id ? 'Approving...' : 'Approve Step'}
+                    </button>
+                    {userRole === 'viewer' && <span style={{ marginLeft: 8, fontSize: 11, color: '#f87171' }}>Viewers cannot approve</span>}
+                  </div>
                 )}
               </div>
             </div>
@@ -195,4 +234,6 @@ const styles: Record<string, React.CSSProperties> = {
   attempts: { color: '#888', fontSize: 11, marginLeft: 8 },
   errorPre: { background: '#1f0f0f', border: '1px solid #3f1f1f', borderRadius: 6, color: '#f87171', fontSize: 11, marginTop: 8, padding: 10, whiteSpace: 'pre-wrap' },
   outputPre: { background: '#111116', border: '1px solid #2a2a35', borderRadius: 6, color: '#4ade80', fontSize: 11, marginTop: 8, padding: 10, whiteSpace: 'pre-wrap' },
+  awaiting: { color: '#f59e0b', fontSize: 12, fontWeight: 600, border: '1px solid #f59e0b', borderRadius: 4, padding: '2px 8px' },
+  approveBtn: { background: '#10b981', color: '#fff', border: 'none', borderRadius: 4, padding: '6px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
 }

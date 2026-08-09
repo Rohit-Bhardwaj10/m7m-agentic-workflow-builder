@@ -43,15 +43,30 @@ export async function executeWorkflowSteps(
     let error: string | null = null
     let status: 'completed' | 'failed' = 'completed'
 
-    try {
-      const config = step.config as Record<string, unknown>
-      output = await executeStep(step.type, config, previousOutput)
-    } catch (err) {
-      error = err instanceof Error ? err.message : String(err)
-      status = 'failed'
+    const MAX_RETRIES = 2
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const config = step.config as Record<string, unknown>
+        output = await executeStep(step.type, config, previousOutput)
+        status = 'completed'
+        error = null
+        break // success, exit retry loop
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err)
+        status = 'failed'
+        if (attempt < MAX_RETRIES) {
+          // Update attempt count on failure before retrying
+          await prisma.stepRun.update({
+            where: { id: stepRun.id },
+            data: { attemptCount: attempt + 1, error },
+          })
+          // Simple backoff
+          await new Promise((r) => setTimeout(r, 1000 * attempt))
+        }
+      }
     }
 
-    // Update step_run with result
+    // Update step_run with final result
     await prisma.stepRun.update({
       where: { id: stepRun.id },
       data: { status, output: output as Prisma.InputJsonValue, error },
