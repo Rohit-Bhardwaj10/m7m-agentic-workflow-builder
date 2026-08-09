@@ -1,0 +1,28 @@
+﻿table:
+  name: org_members
+  schema: public
+object_relationships:
+  - name: org
+    using:
+      foreign_key_constraint_on: org_id
+array_relationships:
+  - name: workflows
+    using:
+      foreign_key_constraint_on:
+        column: created_by
+        table:
+          name: workflows
+          schema: public
+select_permissions:
+  - role: owner
+    permission:
+      columns: "*"
+      filter: {}
+  - role: editor
+    permission:
+      columns: "*"
+      filter: {}
+  - role: viewer
+    permission:
+      columns: "*"
+      filter: {}

@@ -1,0 +1,32 @@
+table:
+  name: organizations
+  schema: public
+array_relationships:
+  - name: members
+    using:
+      foreign_key_constraint_on:
+        column: org_id
+        table:
+          name: org_members
+          schema: public
+  - name: workflows
+    using:
+      foreign_key_constraint_on:
+        column: org_id
+        table:
+          name: workflows
+          schema: public
+# Slice 1: Permissive owner permissions — tightened in Slice 3
+select_permissions:
+  - role: owner
+    permission:
+      columns: "*"
+      filter: {}
+  - role: editor
+    permission:
+      columns: "*"
+      filter: {}
+  - role: viewer
+    permission:
+      columns: "*"
+      filter: {}

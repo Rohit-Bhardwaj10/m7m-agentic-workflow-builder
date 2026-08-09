@@ -1,0 +1,183 @@
+// Prisma 7 schema — AI Agent Workflow Builder
+// Database: nhost-managed PostgreSQL
+// Used by: Next.js API route Action handlers
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // NOTE: In Prisma 7, the URL is configured in prisma.config.ts — not here.
+  // See https://pris.ly/d/config-datasource
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum RoleType {
+  owner
+  editor
+  viewer
+
+  @@map("role_type")
+}
+
+enum StepType {
+  llm_call
+  http_request
+  db_write
+  notify
+  conditional_branch
+  approval_gate
+
+  @@map("step_type")
+}
+
+enum TriggerType {
+  manual
+  webhook
+  scheduled
+  db_event
+
+  @@map("trigger_type")
+}
+
+enum RunStatus {
+  pending
+  running
+  paused
+  completed
+  failed
+
+  @@map("run_status")
+}
+
+enum StepStatus {
+  pending
+  running
+  paused
+  approved
+  rejected
+  completed
+  failed
+
+  @@map("step_status")
+}
+
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+model Organization {
+  id               String      @id @default(uuid())
+  name             String
+  quotaLimit       Int         @default(100) @map("quota_limit")
+  quotaUsed        Int         @default(0)   @map("quota_used")
+  quotaPeriodStart DateTime    @default(now()) @map("quota_period_start")
+
+  members   OrgMember[]
+  workflows Workflow[]
+
+  @@map("organizations")
+}
+
+model OrgMember {
+  id     String   @id @default(uuid())
+  orgId  String   @map("org_id")
+  userId String   @map("user_id")
+  role   RoleType
+
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  workflows Workflow[]   @relation("WorkflowCreator")
+
+  @@unique([orgId, userId])
+  @@map("org_members")
+}
+
+model Workflow {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  name      String
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org     Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  creator OrgMember        @relation("WorkflowCreator", fields: [createdBy], references: [id])
+  steps   WorkflowStep[]
+  trigger WorkflowTrigger?
+  runs    WorkflowRun[]
+
+  @@map("workflows")
+}
+
+model WorkflowStep {
+  id          String   @id @default(uuid())
+  workflowId  String   @map("workflow_id")
+  stepOrder   Int      @map("step_order")
+  type        StepType
+  config      Json     @default("{}")
+
+  workflow Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepRuns StepRun[]
+
+  @@map("workflow_steps")
+}
+
+model WorkflowTrigger {
+  id         String      @id @default(uuid())
+  workflowId String      @unique @map("workflow_id")
+  type       TriggerType
+  config     Json        @default("{}")
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_triggers")
+}
+
+model WorkflowRun {
+  id          String    @id @default(uuid())
+  workflowId  String    @map("workflow_id")
+  status      RunStatus @default(pending)
+  startedBy   String?   @map("started_by")   // nullable — system-initiated runs have no user
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  workflow Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepRuns StepRun[]
+
+  @@map("workflow_runs")
+}
+
+model StepRun {
+  id             String     @id @default(uuid())
+  workflowRunId  String     @map("workflow_run_id")
+  workflowStepId String     @map("workflow_step_id")
+  status         StepStatus @default(pending)
+  input          Json?
+  output         Json?
+  error          String?
+  attemptCount   Int        @default(0) @map("attempt_count")
+  approvedBy     String?    @map("approved_by")   // FK to auth.users — nullable
+  approvedAt     DateTime?  @map("approved_at")
+
+  workflowRun  WorkflowRun  @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  workflowStep WorkflowStep @relation(fields: [workflowStepId], references: [id])
+
+  notifications Notification[]
+
+  @@map("step_runs")
+}
+
+model Notification {
+  id         String    @id @default(uuid())
+  stepRunId  String    @map("step_run_id")
+  channel    String
+  payload    Json      @default("{}")
+  sentAt     DateTime? @map("sent_at")
+
+  stepRun StepRun @relation(fields: [stepRunId], references: [id])
+
+  @@map("notifications")
+}

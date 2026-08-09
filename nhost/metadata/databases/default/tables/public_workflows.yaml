@@ -1,0 +1,54 @@
+table:
+  name: workflows
+  schema: public
+object_relationships:
+  - name: org
+    using:
+      foreign_key_constraint_on: org_id
+  - name: creator
+    using:
+      foreign_key_constraint_on: created_by
+  - name: trigger
+    using:
+      foreign_key_constraint_on:
+        column: workflow_id
+        table:
+          name: workflow_triggers
+          schema: public
+array_relationships:
+  - name: steps
+    using:
+      foreign_key_constraint_on:
+        column: workflow_id
+        table:
+          name: workflow_steps
+          schema: public
+  - name: runs
+    using:
+      foreign_key_constraint_on:
+        column: workflow_id
+        table:
+          name: workflow_runs
+          schema: public
+select_permissions:
+  - role: owner
+    permission:
+      columns: "*"
+      filter: {}
+  - role: editor
+    permission:
+      columns: "*"
+      filter: {}
+  - role: viewer
+    permission:
+      columns: "*"
+      filter: {}
+insert_permissions:
+  - role: owner
+    permission:
+      columns: [org_id, name, created_by]
+      check: {}
+  - role: editor
+    permission:
+      columns: [org_id, name, created_by]
+      check: {}

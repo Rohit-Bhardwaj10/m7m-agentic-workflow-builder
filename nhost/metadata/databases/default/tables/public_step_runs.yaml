@@ -1,0 +1,31 @@
+﻿table:
+  name: step_runs
+  schema: public
+object_relationships:
+  - name: workflow_run
+    using:
+      foreign_key_constraint_on: workflow_run_id
+  - name: workflow_step
+    using:
+      foreign_key_constraint_on: workflow_step_id
+array_relationships:
+  - name: notifications
+    using:
+      foreign_key_constraint_on:
+        column: step_run_id
+        table:
+          name: notifications
+          schema: public
+select_permissions:
+  - role: owner
+    permission:
+      columns: "*"
+      filter: {}
+  - role: editor
+    permission:
+      columns: "*"
+      filter: {}
+  - role: viewer
+    permission:
+      columns: "*"
+      filter: {}
