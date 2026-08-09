@@ -1,13 +1,13 @@
-﻿# context.md — AI Agent Workflow Builder
+# context.md — AI Agent Workflow Builder
 > **Living document.** Update this file after every task. It is the source of truth for current project state.
 
 ---
 
 ## Current Status
 
-- **Active Slice:** Not started
-- **Last Completed Task:** PRD written and synced with original instructions
-- **Next Task:** Begin Slice 1 — scaffold the nhost project, run migrations, seed Org A
+- **Active Slice:** Slice 2
+- **Last Completed Task:** Completed Slice 1 (Scaffolding, Schema, Backend Actions, Basic Frontend)
+- **Next Task:** Begin Slice 2 — Real-time subscriptions and approval_gate step type
 
 ---
 
@@ -28,7 +28,7 @@
 
 | Slice | Name | Status | Done Signal Achieved? |
 |---|---|---|---|
-| S1 | Hello, Workflow | ⬜ Not started | ❌ |
+| S1 | Hello, Workflow | ✅ Done | ✅ |
 | S2 | Watch It Live + Approval Gate | ⬜ Not started | ❌ |
 | S3 | Two Orgs, Airtight Walls | ⬜ Not started | ❌ |
 | S4 | Full Step Palette + Smart Branching | ⬜ Not started | ❌ |

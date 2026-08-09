@@ -1,0 +1,26 @@
+actions:
+  - name: triggerWorkflowRun
+    definition:
+      handler: '{{NHOST_BACKEND_URL}}/api/actions/trigger-workflow-run'
+      forward_client_headers: true
+      headers:
+        - name: Content-Type
+          value: application/json
+    permissions:
+      - role: user
+  - name: approveStep
+    definition:
+      handler: '{{NHOST_BACKEND_URL}}/api/actions/approve-step'
+      forward_client_headers: true
+      headers:
+        - name: Content-Type
+          value: application/json
+    permissions:
+      - role: user
+custom_types:
+  enums: []
+  input_objects: []
+  objects:
+    - name: TriggerWorkflowRunOutput
+    - name: ApproveStepOutput
+  scalars: []
