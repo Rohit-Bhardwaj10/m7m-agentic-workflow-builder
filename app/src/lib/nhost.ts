@@ -8,3 +8,11 @@ export const nhost: any = new NhostClient({
   region: process.env.NEXT_PUBLIC_NHOST_REGION ?? 'ap-south-1',
 })
 
+export function parseJwt(token: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(atob(token.split('.')[1]))
+  } catch {
+    return null
+  }
+}
+

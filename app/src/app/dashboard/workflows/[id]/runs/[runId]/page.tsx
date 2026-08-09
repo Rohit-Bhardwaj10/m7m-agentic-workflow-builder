@@ -89,7 +89,7 @@ export default function RunStatusPage({
     if (!token) { router.replace('/login'); return }
 
     // Get role from JWT for optimistic UI (layer 2 blocks it anyway)
-    import('@/lib/nhost').then(({ parseJwt }) => {
+    import('@/lib/nhost').then(({parseJwt }) => {
       const decoded: any = parseJwt(token)
       setUserRole(decoded?.['https://hasura.io/jwt/claims']?.['x-hasura-default-role'] ?? 'viewer')
     })

@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { nhost } from '@/lib/nhost'
+import { nhost, parseJwt } from '@/lib/nhost'
 import { apolloClient } from '@/lib/apollo'
 import { gql } from '@apollo/client'
 
@@ -193,13 +193,6 @@ function Screen({ children }: { children: React.ReactNode }) {
   )
 }
 
-function parseJwt(token: string): Record<string, unknown> | null {
-  try {
-    return JSON.parse(atob(token.split('.')[1]))
-  } catch {
-    return null
-  }
-}
 
 const styles: Record<string, React.CSSProperties> = {
   heading: { color: '#fff', fontSize: 24, fontWeight: 700, margin: '4px 0' },
