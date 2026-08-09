@@ -6,6 +6,9 @@ import { nhost } from '@/lib/nhost'
 
 export default function LoginPage() {
   const router = useRouter()
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -17,16 +20,36 @@ export default function LoginPage() {
     if (token) router.replace('/dashboard')
   }, [router])
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      const { error } = await nhost.auth.signIn({ email, password })
-      if (error) {
-        setError(error.message)
+      if (isSignUp) {
+        const { session, error } = await nhost.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            displayName: `${firstName} ${lastName}`.trim()
+          }
+        })
+        if (error) {
+          setError(error.message)
+        } else if (session) {
+          // If email verification is OFF, Nhost logs us in immediately
+          router.replace('/dashboard')
+        } else {
+          // If email verification is ON, they need to verify
+          alert('Sign up successful! Please check your email to verify your account.')
+          setIsSignUp(false)
+        }
       } else {
-        router.replace('/dashboard')
+        const { error } = await nhost.auth.signIn({ email, password })
+        if (error) {
+          setError(error.message)
+        } else {
+          router.replace('/dashboard')
+        }
       }
     } catch (err) {
       setError('Unexpected error. Please try again.')
@@ -41,7 +64,33 @@ export default function LoginPage() {
       <div style={styles.card}>
         <h1 style={styles.title}>mini-n8n</h1>
         <p style={styles.subtitle}>AI Agent Workflow Builder</p>
-        <form onSubmit={handleLogin} style={styles.form}>
+        <form onSubmit={handleSubmit} style={styles.form}>
+          {isSignUp && (
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={styles.label}>First Name</label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="John"
+                  required={isSignUp}
+                  style={styles.input}
+                />
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={styles.label}>Last Name</label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Doe"
+                  required={isSignUp}
+                  style={styles.input}
+                />
+              </div>
+            </div>
+          )}
           <label style={styles.label}>Email</label>
           <input
             id="email"
@@ -64,10 +113,26 @@ export default function LoginPage() {
             style={styles.input}
           />
           {error && <p style={styles.error}>{error}</p>}
-          <button id="login-btn" type="submit" disabled={loading} style={styles.button}>
-            {loading ? 'Signing in…' : 'Sign In'}
+          <button id="submit-btn" type="submit" disabled={loading} style={styles.button}>
+            {loading ? 'Wait…' : (isSignUp ? 'Create Account' : 'Sign In')}
           </button>
         </form>
+        
+        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          <p style={{ color: '#888', fontSize: '14px', margin: 0 }}>
+            {isSignUp ? 'Already have an account?' : "Don't have an account?"}
+            <button 
+              type="button" 
+              onClick={() => { setIsSignUp(!isSignUp); setError(''); }} 
+              style={{ 
+                background: 'none', border: 'none', color: '#6366f1', 
+                cursor: 'pointer', fontWeight: 600, marginLeft: '6px' 
+              }}
+            >
+              {isSignUp ? 'Sign In' : 'Sign Up'}
+            </button>
+          </p>
+        </div>
       </div>
     </main>
   )

@@ -37,26 +37,33 @@ export async function POST(req: NextRequest) {
   const userId = body.session_variables['x-hasura-user-id']
   const role = body.session_variables['x-hasura-role']
 
-  // ── Slice 1: basic role check (owner/editor only) ──────────────────────────
-  // Full org-membership verification added in Slice 3.
-  if (role === 'viewer') {
-    return NextResponse.json(
-      { message: 'Viewers cannot trigger workflow runs.' },
-      { status: 403 }
-    )
-  }
-
   try {
-    // 1. Load workflow + steps ordered by step_order
+    // 1. Load workflow + steps + organization members
     const workflow = await prisma.workflow.findUnique({
       where: { id: workflow_id },
       include: {
         steps: { orderBy: { stepOrder: 'asc' } },
+        org: {
+          include: {
+            members: {
+              where: { userId }
+            }
+          }
+        }
       },
     })
 
     if (!workflow) {
       return NextResponse.json({ message: 'Workflow not found.' }, { status: 404 })
+    }
+
+    // ── Slice 3: strict org membership check (Layer 2) ──────────────────────────
+    const member = workflow.org.members[0]
+    if (!member) {
+      return NextResponse.json({ message: 'Access denied: You are not a member of this organization.' }, { status: 403 })
+    }
+    if (member.role === 'viewer') {
+      return NextResponse.json({ message: 'Access denied: Viewers cannot trigger workflow runs.' }, { status: 403 })
     }
 
     // 2. Create workflow_run row (status = running)

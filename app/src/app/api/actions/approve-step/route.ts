@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 2. Fetch the step run + workflow details
+    // 2. Fetch the step run + workflow details + org members
     const stepRun = await prisma.stepRun.findUnique({
       where: { id: step_run_id },
       include: {
@@ -41,6 +41,13 @@ export async function POST(req: NextRequest) {
             workflow: {
               include: {
                 steps: { orderBy: { stepOrder: 'asc' } },
+                org: {
+                  include: {
+                    members: {
+                      where: { userId }
+                    }
+                  }
+                }
               },
             },
           },
@@ -50,6 +57,15 @@ export async function POST(req: NextRequest) {
 
     if (!stepRun) {
       return NextResponse.json({ message: 'Step run not found.' }, { status: 404 })
+    }
+
+    // ── Slice 3: strict org membership check (Layer 2) ──────────────────────────
+    const member = stepRun.workflowRun.workflow.org.members[0]
+    if (!member) {
+      return NextResponse.json({ message: 'Access denied: You are not a member of this organization.' }, { status: 403 })
+    }
+    if (member.role === 'viewer') {
+      return NextResponse.json({ message: 'Access denied: Viewers cannot approve steps.' }, { status: 403 })
     }
 
     if (stepRun.status !== 'paused' || stepRun.workflowStep.type !== 'approval_gate') {
